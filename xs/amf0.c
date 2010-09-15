@@ -116,7 +116,7 @@ void amf0_data_free(amf0_data_t* data) {
 }
 
 amf0_number_t* amf0_number_init(double n) {
-    amf0_number_t* number = (amf0_number_t*)calloc(1, sizeof(amf0_number_t));
+    amf0_number_t* number = (amf0_number_t*)malloc(sizeof(amf0_number_t));
     number->type  = AMF0_NUMBER;
     number->value = n;
 
@@ -128,7 +128,7 @@ void amf0_number_free(amf0_number_t* number) {
 }
 
 amf0_boolean_t* amf0_boolean_init(int b) {
-    amf0_boolean_t* bool = (amf0_boolean_t*)calloc(1, sizeof(amf0_boolean_t));
+    amf0_boolean_t* bool = (amf0_boolean_t*)malloc(sizeof(amf0_boolean_t));
     bool->type  = AMF0_BOOLEAN;
     bool->value = b;
 
@@ -140,18 +140,13 @@ void amf0_boolean_free(amf0_boolean_t* bool) {
 }
 
 amf0_string_t* amf0_string_init(const char* buf) {
-    amf0_string_t* string = (amf0_string_t*)calloc(1, sizeof(amf0_string_t));
-    string->type  = AMF0_STRING;
-    string->value = (char*)calloc(1, strlen((char*)buf) + 1);
-    memcpy(string->value, buf, strlen(buf));
-
-    return string;
+    return amf0_string_init_len(buf, strlen((char*)buf));
 }
 
 amf0_string_t* amf0_string_init_len(const char* buf, int len) {
-    amf0_string_t* string = (amf0_string_t*)calloc(1, sizeof(amf0_string_t));
+    amf0_string_t* string = (amf0_string_t*)malloc(sizeof(amf0_string_t));
     string->type  = AMF0_STRING;
-    string->value = (char*)calloc(1, len);
+    string->value = (char*)calloc(1, len + 1);
     memcpy(string->value, buf, len);
 
     return string;
@@ -176,36 +171,40 @@ void amf0_object_free(amf0_object_t* obj) {
     for (i = 0; i < obj->used; ++i) {
         kv = obj->data[i];
 
-        free((char*)kv->key);
+        free(kv->key);
         amf0_data_free(kv->value);
         free(kv);
     }
 
-    if (NULL != obj->data) free(obj->data);
+    free(obj->data);
     free(obj);
 }
 
 void amf0_object_add(amf0_object_t* obj, const char* key, amf0_data_t* value) {
     amf0_object_keyvalue_t* kv;
+    int len = strlen(key);
 
     if (NULL == obj->data) {
         obj->data =
-            (amf0_object_keyvalue_t**)calloc(1, sizeof(amf0_object_keyvalue_t*));
+            (amf0_object_keyvalue_t**)malloc(sizeof(amf0_object_keyvalue_t*));
     }
     else {
         obj->data = (amf0_object_keyvalue_t**)realloc(obj->data, sizeof(amf0_object_keyvalue_t*) * (obj->used + 1));
     }
     assert(NULL != obj->data);
 
-    kv = (amf0_object_keyvalue_t*)calloc(1, sizeof(amf0_object_keyvalue_t));
-    kv->key   = key;
+    kv = (amf0_object_keyvalue_t*)malloc(sizeof(amf0_object_keyvalue_t));
+
+    kv->key = (char*)calloc(1, len + 1);
+    memcpy(kv->key, key, len);
+
     kv->value = value;
 
     obj->data[obj->used++] = kv;
 }
 
 amf0_null_t* amf0_null_init() {
-    amf0_null_t* null = (amf0_null_t*)calloc(1, sizeof(amf0_null_t));
+    amf0_null_t* null = (amf0_null_t*)malloc(sizeof(amf0_null_t));
     null->type = AMF0_NULL;
     return null;
 }
@@ -215,7 +214,7 @@ void amf0_null_free(amf0_null_t* null) {
 }
 
 amf0_undefined_t* amf0_undefined_init() {
-    amf0_undefined_t* undef = (amf0_undefined_t*)calloc(1, sizeof(amf0_undefined_t));
+    amf0_undefined_t* undef = (amf0_undefined_t*)malloc(sizeof(amf0_undefined_t));
     undef->type = AMF0_UNDEFINED;
     return undef;
 }
@@ -233,7 +232,7 @@ amf0_strictarray_t* amf0_strictarray_init() {
 
 void amf0_strictarray_add(amf0_strictarray_t* array, amf0_data_t* data) {
     if (NULL == array->data) {
-        array->data = (amf0_data_t**)calloc(1, sizeof(amf0_data_t*));
+        array->data = (amf0_data_t**)malloc(sizeof(amf0_data_t*));
     }
     else {
         array->data = (amf0_data_t**)realloc(array->data, sizeof(amf0_data_t*) * (array->used + 1));
@@ -300,7 +299,7 @@ amf0_t* amf0_decode(const char* buf, int len) {
 
 void amf0_append(amf0_t* amf, amf0_data_t* data) {
     if (NULL == amf->data) {
-        amf->data = (amf0_data_t**)calloc(1, sizeof(amf0_data_t*));
+        amf->data = (amf0_data_t**)malloc(sizeof(amf0_data_t*));
     }
     else {
         amf->data = (amf0_data_t**)realloc(amf->data, sizeof(amf0_data_t*) * (amf->used + 1));
@@ -416,7 +415,6 @@ int amf0_decode_string(amf0_data_t** data, const char* buf, int len) {
 
     b = (char*)calloc(1, s + 1);
     memcpy(b, buf + 2, s);
-    b[s] = '\0';
 
     string = amf0_string_init(b);
     *data = (amf0_data_t*)string;
@@ -503,7 +501,6 @@ int amf0_decode_object(amf0_data_t** data, const char* buf, int len) {
 
         b = (char*)calloc(1, s + 1);
         memcpy(b, buf + p, s);
-        b[s] = '\0';
         p += s;
 
         r = amf0_decode_data(&d, buf + p, len - p);
@@ -515,6 +512,8 @@ int amf0_decode_object(amf0_data_t** data, const char* buf, int len) {
         assert(NULL != d);
 
         amf0_object_add(obj, b, d);
+
+        free(b);
     }
 
     *data = (amf0_data_t*)obj;
